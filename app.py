@@ -37,40 +37,43 @@ def _extract_data(text: str, filename: str) -> dict:
     errors = []
     is_cn = bool(re.search(r"Credit Note Number", text))
 
-    # 日付
-    pat = r"Credit Note\s*[\r\n]+\s*([A-Za-z]{3}\s+\d{1,2},\s+\d{4})" if is_cn \
-        else r"Tax invoice\s*[\r\n]+\s*([A-Za-z]{3}\s+\d{1,2},\s+\d{4})"
+    # 日付（"Tax invoice"/"Credit Note" と日付の間に請求書番号の行が挟まることがある）
+    pat = r"Credit Note[\s\S]*?([A-Za-z]{3}\s+\d{1,2},\s+\d{4})" if is_cn \
+        else r"Tax invoice[\s\S]*?([A-Za-z]{3}\s+\d{1,2},\s+\d{4})"
     dm = re.search(pat, text)
     date = _parse_date(dm.group(1)) if dm else None
     if not date:
         errors.append("日付が見つかりません")
 
-    # eBay user ID
-    um = re.search(r"eBay user ID\s*[\r\n]+\s*([\w\-\.]+)", text)
+    # eBay user ID（ラベルとIDの間に列見出し "Type (Non-Taxable) Net" が挟まることがある）
+    um = re.search(
+        r"eBay user ID\s*[\r\n]+\s*(?:Type \(Non-Taxable\) Net\s*[\r\n]+\s*)?([\w\-\.]+)",
+        text,
+    )
     user_id = um.group(1).strip() if um else None
     if not user_id:
         errors.append("eBay user IDが見つかりません")
 
-    # 金額
+    # 金額（PDF内ではラベルの後に金額が続く）
     taxable = jct = None
     YEN = r"[¥￥]"
     if is_cn:
-        m = re.search(rf"-{YEN}\s*([\d,]+)Total credited amount at 10 % in JPY", text)
+        m = re.search(rf"Total credited amount at 10 % in JPY\s*-{YEN}\s*([\d,]+)", text)
         taxable = -_parse_amount(m.group(1)) if m else None
         if taxable is None:
             errors.append("税抜金額 (Total credited amount at 10 % in JPY) が見つかりません")
 
-        m = re.search(rf"-{YEN}\s*([\d,]+)Total JCT credited at 10 % in JPY", text)
+        m = re.search(rf"Total JCT credited at 10 % in JPY\s*-{YEN}\s*([\d,]+)", text)
         jct = -_parse_amount(m.group(1)) if m else None
         if jct is None:
             errors.append("消費税額 (Total JCT credited at 10 % in JPY) が見つかりません")
     else:
-        m = re.search(rf"{YEN}\s*([\d,]+)Total taxable amount at 10 % in JPY", text)
+        m = re.search(rf"Total taxable amount at 10 % in JPY\s*{YEN}\s*([\d,]+)", text)
         taxable = _parse_amount(m.group(1)) if m else None
         if taxable is None:
             errors.append("税抜金額 (Total taxable amount at 10 % in JPY) が見つかりません")
 
-        m = re.search(rf"{YEN}\s*([\d,]+)JCT at 10 % in JPY", text)
+        m = re.search(rf"JCT at 10 % in JPY\s*{YEN}\s*([\d,]+)", text)
         jct = _parse_amount(m.group(1)) if m else None
         if jct is None:
             errors.append("消費税額 (JCT at 10 % in JPY) が見つかりません")
