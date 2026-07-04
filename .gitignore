@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+node_modules/
+ebay_fees_summary.csv
+ebay_fees_yayoi.txt
+ebay_fees_data_tmp.json
+eBay_tax_invoice/
