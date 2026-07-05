@@ -45,12 +45,16 @@ def _extract_data(text: str, filename: str) -> dict:
     if not date:
         errors.append("日付が見つかりません")
 
-    # eBay user ID（ラベルとIDの間に列見出し "Type (Non-Taxable) Net" が挟まることがある）
-    um = re.search(
-        r"eBay user ID\s*[\r\n]+\s*(?:Type \(Non-Taxable\) Net\s*[\r\n]+\s*)?([\w\-\.]+)",
-        text,
-    )
-    user_id = um.group(1).strip() if um else None
+    # eBay user ID（右列の手数料明細の行数により、ラベルと実際のIDの間に
+    # 別カラムのテキストが0行〜1行挟まる。IDは常にそれ単独で1行を占めるため、
+    # ラベル以降で最初に「単独の1行」として現れる行を採用する）
+    user_id = None
+    label_idx = text.find("eBay user ID")
+    if label_idx != -1:
+        remainder = text[label_idx + len("eBay user ID"):]
+        um = re.search(r"^\s*([\w\-\.]+)\s*$", remainder, re.MULTILINE)
+        if um:
+            user_id = um.group(1).strip()
     if not user_id:
         errors.append("eBay user IDが見つかりません")
 
